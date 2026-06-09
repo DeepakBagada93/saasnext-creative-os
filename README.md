@@ -12,16 +12,18 @@ A production-ready Model Context Protocol (MCP) server for marketing agencies. I
                   AI Clients (Claude, Gemini CLI, Cursor, etc.)
                                        │
                          (Stdio / SSE) ├─────────────────────────┐
+                                       │                         │
                                        ▼                         ▼
                               CreativeOS MCP            Next.js Dashboard
-                                       │                    (Workspace UI)
-                  ┌────────────────────┴────────────────────┐
-                  ▼                                         ▼
+                              (Python FastAPI)            (Workspace UI)
+                                       │                         │
+                  ┌────────────────────┴────────────────────┐    │
+                  ▼                                         ▼    ▼
          Google Gemini API                         Supabase Database
         (Content & Embeddings)                    (Tenancy & Vector Search)
 ```
 
-- **Tenancy Isolation**: Runs on Express inside the backend. Uses `AsyncLocalStorage` to associate active SSE sessions with the correct authenticated workspace and pricing tier.
+- **Tenancy Isolation**: Runs on FastAPI inside the backend. Uses task-local `contextvars.ContextVar` to associate active SSE sessions and REST requests with the correct authenticated workspace and pricing tier.
 - **Proactive Memory Retrieval**: Before generating new hooks, angles, or briefs, the server searches Supabase for historical winning campaigns and passes them to the LLM to guide voice and effectiveness.
 - **SaaS Limit Enforcement**: Validates workspace constraints on client count and saved assets dynamically before writing to the database.
 
@@ -29,7 +31,7 @@ A production-ready Model Context Protocol (MCP) server for marketing agencies. I
 
 ## Tech Stack
 
-- **MCP Server (Backend)**: Node.js, TypeScript, MCP SDK, Express, CORS, Supabase, Zod, Dotenv.
+- **MCP Server (Backend)**: Python, FastAPI, Uvicorn, FastMCP SDK (MCP Python SDK), Supabase Python client, Google GenAI SDK, Pydantic, Python-dotenv.
 - **Dashboard (Frontend)**: Next.js, React, Tailwind CSS, Lucide icons.
 - **Database**: Supabase PostgreSQL + `pgvector` extension.
 
@@ -53,9 +55,16 @@ Limits are enforced at the database layer of the MCP gateway:
 
 ### 1. Installation
 
-Install all backend dependencies:
+Set up a Python virtual environment and install backend dependencies:
 ```bash
-npm install
+# Using standard Python venv and pip
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Or using uv (much faster)
+uv venv
+uv pip install -r requirements.txt
 ```
 
 Install frontend dependencies:
@@ -77,11 +86,21 @@ TRANSPORT=stdio
 PORT=3000
 ```
 
-*Note: If no database credentials are provided, the server falls back to an in-memory database with a native TypeScript cosine-similarity vector query engine so you can test connection instantly.*
+*Note: If no database credentials are provided, the server falls back to an in-memory database with a native Python cosine-similarity vector query engine so you can test connection instantly.*
 
-### 3. Database Schema Migration
+### 3. Running the Backend Server Locally
 
-The tables have been automatically migrated to your database. For manual verification, you can run the [schema.sql](schema.sql) script inside the Supabase SQL Editor.
+To run in **Stdio** mode (for local IDE connections):
+```bash
+python3 server.py
+```
+
+To run in **SSE** mode (for network integrations and the Next.js dashboard):
+```bash
+python3 -m uvicorn server:app --port 3000
+# Or using environment variables
+TRANSPORT=sse PORT=3000 python3 server.py
+```
 
 ---
 
@@ -96,8 +115,8 @@ Add to `~/.config/claude.json` or run `claude config`:
 {
   "mcpServers": {
     "creativeos": {
-      "command": "node",
-      "args": ["/absolute/path/to/creativeos/dist/server.js"],
+      "command": "/absolute/path/to/creativeos/.venv/bin/python3",
+      "args": ["/absolute/path/to/creativeos/server.py"],
       "env": {
         "CREATIVEOS_API_KEY": "cos_live_mockkey12345",
         "GEMINI_API_KEY": "YOUR_GEMINI_API_KEY"
@@ -113,7 +132,7 @@ Add to `~/.config/claude.json` or run `claude config`:
 3. Fill in the options:
    - **Name**: `creativeos`
    - **Type**: `stdio`
-   - **Command**: `node /absolute/path/to/creativeos/dist/server.js`
+   - **Command**: `/absolute/path/to/creativeos/.venv/bin/python3 /absolute/path/to/creativeos/server.py`
 4. Set environment variables:
    - `CREATIVEOS_API_KEY`: `cos_live_mockkey12345`
    - `GEMINI_API_KEY`: `YOUR_GEMINI_API_KEY`
@@ -125,8 +144,8 @@ Configure your global CLI settings:
 {
   "mcpServers": {
     "creativeos": {
-      "command": "node",
-      "args": ["/absolute/path/to/creativeos/dist/server.js"],
+      "command": "/absolute/path/to/creativeos/.venv/bin/python3",
+      "args": ["/absolute/path/to/creativeos/server.py"],
       "env": {
         "CREATIVEOS_API_KEY": "cos_live_mockkey12345",
         "GEMINI_API_KEY": "YOUR_GEMINI_API_KEY"
@@ -143,8 +162,8 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 {
   "mcpServers": {
     "creativeos": {
-      "command": "node",
-      "args": ["/absolute/path/to/creativeos/dist/server.js"],
+      "command": "/absolute/path/to/creativeos/.venv/bin/python3",
+      "args": ["/absolute/path/to/creativeos/server.py"],
       "env": {
         "CREATIVEOS_API_KEY": "cos_live_mockkey12345",
         "GEMINI_API_KEY": "YOUR_GEMINI_API_KEY"
@@ -176,7 +195,7 @@ Visit [http://localhost:3001](http://localhost:3001) (or check output port) to:
 
 ## Cloud Deployment Guide (Vercel)
 
-Both the Next.js frontend and the Express backend MCP server are fully optimized to deploy to **Vercel** serverless environments without Docker.
+Both the Next.js frontend and the FastAPI backend MCP server are fully optimized to deploy to **Vercel** serverless environments without Docker.
 
 ---
 
@@ -191,7 +210,7 @@ Both the Next.js frontend and the Express backend MCP server are fully optimized
 ---
 
 ### 2. Backend MCP Server Deployment
-The root directory contains a [vercel.json](vercel.json) file that automatically routes SSE and API traffic to the serverless-adapted Express app:
+The root directory contains a [vercel.json](vercel.json) file that automatically routes SSE and API traffic to the serverless-adapted FastAPI app:
 
 1. Import the root repository to **Vercel** as a new project.
 2. In **Environment Variables**, add:
@@ -204,5 +223,3 @@ The root directory contains a [vercel.json](vercel.json) file that automatically
    - **SSE Endpoint**: `https://your-backend-app.vercel.app/sse`
    - **Messages Endpoint**: `https://your-backend-app.vercel.app/messages`
    - **Header**: `x-api-key`: `cos_live_mockkey12345` (or your custom API key)
-
-

@@ -28,3 +28,8 @@ frontend/.env.local
 # OS files
 .DS_Store
 Thumbs.db
+
+# Python files
+__pycache__/
+*.py[cod]
+.venv/
