@@ -174,18 +174,58 @@ Visit [http://localhost:3001](http://localhost:3001) (or check output port) to:
 
 ---
 
-## Secure Cloud Deployment (Railway)
+## Cloud Deployment Guide
 
-We provide a direct [Dockerfile](Dockerfile) and [railway.json](railway.json) configuration for cloud deployment:
+### 1. Frontend Deployment (Vercel)
+Next.js is fully optimized for Vercel. To deploy the frontend:
+1. Connect your repository to **Vercel**.
+2. Under **Project Settings**, configure the **Root Directory** to `frontend`.
+3. In **Environment Variables**, add:
+   - `NEXT_PUBLIC_SUPABASE_URL` = `https://your-supabase-url.supabase.co`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `your-anon-key`
+4. Click **Deploy**. Vercel will build the Next.js static pages and serve it.
 
-1. Link your repo to **Railway**.
-2. Define the variables:
-   - `SUPABASE_URL`
-   - `SUPABASE_ANON_KEY`
-   - `GEMINI_API_KEY`
-   - `TRANSPORT=sse`
-   - `PORT=3000`
-3. Railway will start the server using Server-Sent Events (SSE) securely.
-4. Point your local IDE settings to the web endpoint:
-   - URL: `https://your-app.up.railway.app/sse`
-   - Custom Header: `x-api-key: cos_live_mockkey12345`
+---
+
+### 2. Backend Deployment (Railway, Render, or Fly.io)
+The MCP backend runs as a standard Node.js server using a Docker container.
+1. Connect your repository to **Railway**, **Render**, or **Fly.io**.
+2. The platform will automatically detect the root [Dockerfile](Dockerfile).
+3. Set the following environment variables:
+   - `TRANSPORT` = `sse`
+   - `PORT` = `3000`
+   - `GEMINI_API_KEY` = `your-gemini-key`
+   - `SUPABASE_URL` = `your-supabase-url`
+   - `SUPABASE_ANON_KEY` = `your-supabase-anon-key`
+4. Deploy the service. It will expose a public web address (e.g. `https://creativeos.onrender.com`).
+5. Configure your IDE client to point to the SSE URL:
+   - **Endpoint**: `https://your-backend-app.com/sse`
+   - **Header**: `x-api-key`: `cos_live_mockkey12345` (or your custom API key)
+
+---
+
+### 3. AWS Deployment (AWS App Runner or ECS Fargate)
+For enterprise hosting on AWS:
+
+#### Option A: AWS App Runner (Recommended)
+1. Push your built Docker container to **Amazon ECR** (Elastic Container Registry), or connect App Runner directly to your GitHub repository.
+2. Configure App Runner settings:
+   - **Runtime**: `Docker`
+   - **Port**: `3000`
+3. Add the required environment variables (`TRANSPORT=sse`, `PORT=3000`, `GEMINI_API_KEY`, etc.) in the App Runner console configuration.
+4. Deploy. AWS will provision load balancers and secure endpoints automatically.
+
+#### Option B: Amazon ECS (Fargate)
+1. Build and push the docker image to ECR:
+   ```bash
+   docker build -t creativeos-mcp .
+   docker tag creativeos-mcp:latest <ECR_REPO_URL>:latest
+   docker push <ECR_REPO_URL>:latest
+   ```
+2. Create an ECS **Task Definition** using the **Fargate** launch type:
+   - Memory: `0.5 GB` or `1 GB`
+   - CPU: `0.25 vCPU` or `0.5 vCPU`
+   - Map Port `3000` (TCP)
+3. Set the environment variables in the container definition section.
+4. Launch an ECS Service under an Application Load Balancer (ALB) to expose the service over HTTPS.
+
