@@ -567,7 +567,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error("[CreativeOS MCP] Fatal server startup error:", err);
-  process.exit(1);
-});
+if (!process.env.VERCEL) {
+  main().catch((err) => {
+    console.error("[CreativeOS MCP] Fatal server startup error:", err);
+    process.exit(1);
+  });
+}
+
+export default app;

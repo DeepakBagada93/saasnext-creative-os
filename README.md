@@ -174,58 +174,35 @@ Visit [http://localhost:3001](http://localhost:3001) (or check output port) to:
 
 ---
 
-## Cloud Deployment Guide
+## Cloud Deployment Guide (Vercel)
 
-### 1. Frontend Deployment (Vercel)
-Next.js is fully optimized for Vercel. To deploy the frontend:
+Both the Next.js frontend and the Express backend MCP server are fully optimized to deploy to **Vercel** serverless environments without Docker.
+
+---
+
+### 1. Frontend Dashboard Deployment
 1. Connect your repository to **Vercel**.
-2. Under **Project Settings**, configure the **Root Directory** to `frontend`.
-3. In **Environment Variables**, add:
+2. Under **Project Settings**, set the **Root Directory** to `frontend`.
+3. In **Environment Variables**, configure:
    - `NEXT_PUBLIC_SUPABASE_URL` = `https://your-supabase-url.supabase.co`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `your-anon-key`
 4. Click **Deploy**. Vercel will build the Next.js static pages and serve it.
 
 ---
 
-### 2. Backend Deployment (Railway, Render, or Fly.io)
-The MCP backend runs as a standard Node.js server using a Docker container.
-1. Connect your repository to **Railway**, **Render**, or **Fly.io**.
-2. The platform will automatically detect the root [Dockerfile](Dockerfile).
-3. Set the following environment variables:
-   - `TRANSPORT` = `sse`
-   - `PORT` = `3000`
-   - `GEMINI_API_KEY` = `your-gemini-key`
+### 2. Backend MCP Server Deployment
+The root directory contains a [vercel.json](vercel.json) file that automatically routes SSE and API traffic to the serverless-adapted Express app:
+
+1. Import the root repository to **Vercel** as a new project.
+2. In **Environment Variables**, add:
+   - `GEMINI_API_KEY` = `your-gemini-api-key`
    - `SUPABASE_URL` = `your-supabase-url`
    - `SUPABASE_ANON_KEY` = `your-supabase-anon-key`
-4. Deploy the service. It will expose a public web address (e.g. `https://creativeos.onrender.com`).
-5. Configure your IDE client to point to the SSE URL:
-   - **Endpoint**: `https://your-backend-app.com/sse`
+   - `CREATIVEOS_API_KEY` = `cos_live_mockkey12345` (or your custom API key)
+3. Click **Deploy**. Vercel will build and expose your serverless MCP backend (e.g. `https://creativeos-mcp.vercel.app`).
+4. Configure your IDE client to point to the SSE URL:
+   - **SSE Endpoint**: `https://your-backend-app.vercel.app/sse`
+   - **Messages Endpoint**: `https://your-backend-app.vercel.app/messages`
    - **Header**: `x-api-key`: `cos_live_mockkey12345` (or your custom API key)
 
----
-
-### 3. AWS Deployment (AWS App Runner or ECS Fargate)
-For enterprise hosting on AWS:
-
-#### Option A: AWS App Runner (Recommended)
-1. Push your built Docker container to **Amazon ECR** (Elastic Container Registry), or connect App Runner directly to your GitHub repository.
-2. Configure App Runner settings:
-   - **Runtime**: `Docker`
-   - **Port**: `3000`
-3. Add the required environment variables (`TRANSPORT=sse`, `PORT=3000`, `GEMINI_API_KEY`, etc.) in the App Runner console configuration.
-4. Deploy. AWS will provision load balancers and secure endpoints automatically.
-
-#### Option B: Amazon ECS (Fargate)
-1. Build and push the docker image to ECR:
-   ```bash
-   docker build -t creativeos-mcp .
-   docker tag creativeos-mcp:latest <ECR_REPO_URL>:latest
-   docker push <ECR_REPO_URL>:latest
-   ```
-2. Create an ECS **Task Definition** using the **Fargate** launch type:
-   - Memory: `0.5 GB` or `1 GB`
-   - CPU: `0.25 vCPU` or `0.5 vCPU`
-   - Map Port `3000` (TCP)
-3. Set the environment variables in the container definition section.
-4. Launch an ECS Service under an Application Load Balancer (ALB) to expose the service over HTTPS.
 
